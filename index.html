@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Currency Chaos — Team Dashboard</title>
+<style>
+  :root{
+    --bg:#f6f6f6;
+    --card:#ffffff;
+    --accent:#2b6ef2;
+    --accent-dark:#1f52b8;
+    --border:#d9d9d9;
+    --ink:#1a1a1a;
+    --muted:#666;
+  }
+  body{font-family:system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin:0; padding:24px; background:var(--bg); color:var(--ink);}
+  .container{max-width:1100px; margin:0 auto; background:var(--card); border-radius:14px; box-shadow:0 8px 30px rgba(0,0,0,0.08);}
+  header{padding:24px 24px 12px; border-bottom:1px solid var(--border);}
+  header h1{margin:0 0 8px; font-size:24px; font-weight:700; text-align:center;}
+  header p{margin:0; color:var(--muted); text-align:center;}
+  .grid{display:grid; gap:20px; padding:24px; grid-template-columns:1.2fr 1fr;}
+  .card{background:#fff; border:1px solid var(--border); border-radius:12px; padding:16px;}
+  h2{margin:0 0 12px; font-size:18px; font-weight:700;}
+  .row{display:flex; gap:12px; flex-wrap:wrap}
+  .col{flex:1 min(280px, 100%)}
+  label{display:block; font-size:13px; margin-bottom:6px;}
+  select,input[type="number"]{width:100%; padding:10px 12px; font-size:14px; border:1px solid var(--border); border-radius:8px;}
+  button{display:inline-flex; align-items:center; justify-content:center; gap:8px; padding:10px 14px; border:none; border-radius:8px; background:var(--accent); color:#fff; font-weight:600; cursor:pointer;}
+  button:hover{background:var(--accent-dark)}
+  button.secondary{background:#eef3ff; color:#0f2a6b; border:1px solid #c9d7ff;}
+  .inline-actions{display:flex; gap:10px; flex-wrap:wrap}
+  .pill{display:inline-flex; align-items:center; gap:8px; padding:8px 10px; border-radius:8px; background:#f7f9ff; border:1px solid #e2e8ff; color:#0f2a6b; font-size:13px;}
+  .banks-grid{display:grid; gap:10px; grid-template-columns:repeat(3,1fr);}
+  .bank{border:1px solid var(--border); border-radius:10px; padding:10px;}
+  .bank h3{margin:0 0 8px; font-size:14px;}
+  .bank .amount{font-weight:700; font-size:22px; line-height:1.4;}
+  .bank .precise{font-size:14px; color:var(--muted); margin-top:4px;}
+  @media(max-width:600px){.bank h3{font-size:16px;} .bank .amount{font-size:24px;}}
+  canvas{width:100%; height:280px; border:1px solid var(--border); border-radius:10px; background:#fff}
+  .footer{padding:16px 24px 24px; border-top:1px solid var(--border); display:flex; flex-wrap:wrap; gap:10px;}
+  .final-score{font-weight:700; font-size:16px; padding:8px 12px; border:1px solid var(--border); border-radius:8px; background:#fafafa;}
+  .modal-backdrop{position:fixed; inset:0; background:rgba(0,0,0,0.35); display:none; align-items:center; justify-content:center; z-index:1000;}
+  .modal{width:min(720px,95vw); background:#fff; border-radius:12px; box-shadow:0 12px 40px rgba(0,0,0,0.3);}
+  .modal header{border-bottom:1px solid var(--border);}
+  .modal .content{padding:16px}
+  .modal .grid-6{display:grid; gap:12px; grid-template-columns:repeat(3,1fr)}
+  .modal .actions{display:flex; gap:10px; padding:12px 16px; border-top:1px solid var(--border); justify-content:flex-end}
+  .error{color:#b00020; font-size:13px; margin-top:8px}
+  .success{color:#0c6b30; font-size:13px; margin-top:8px}
+</style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Currency Chaos — Team Dashboard</h1>
+      <p>Manage six currencies, convert, and advance through custom rounds.</p>
+      <!-- Number of rounds selector -->
+      <div class="row" style="justify-content:center; margin-top:12px;">
+        <div class="col" style="max-width:220px;">
+          <label for="roundCount">Number of rounds</label>
+          <input type="number" id="roundCount" min="1" max="20" value="4" />
+        </div>
+      </div>
+    </header>
+
+    <div class="grid">
+      <!-- Left: Converter and Chart -->
+      <section class="card" aria-labelledby="converter-title">
+        <h2 id="converter-title">Currency converter</h2>
+        <div class="row">
+          <div class="col">
+            <label>From currency</label>
+            <select id="convertFrom"></select>
+          </div>
+          <div class="col">
+            <label>To currency</label>
+            <select id="convertTo"></select>
+          </div>
+          <div class="col">
+            <label>Amount</label>
+            <input type="number" id="convertAmount" min="0" step="0.01" placeholder="0.00" />
+          </div>
+        </div>
+        <div class="inline-actions">
+          <button id="convertBtn">Convert</button>
+          <span class="pill"><strong>Display:</strong> Whole dollars in UI, precise in popup.</span>
+        </div>
+
+        <hr style="border:none;border-top:1px solid #eee;margin:16px 0" />
+
+        <h2>Bank balances chart</h2>
+        <canvas id="bankChart" width="800" height="280" aria-label="Bank balances bar chart"></canvas>
+      </section>
+
+      <!-- Right: Banks and Values -->
+      <section class="card" aria-labelledby="banks-title">
+        <h2 id="banks-title">Banks and manual current values</h2>
+        <div class="banks-grid" id="banksGrid"></div>
+        <p class="help pill" style="margin-top:10px;"><strong>Note:</strong> Set each team’s current value (sum of dice). Conversions use ratios; income credits only the selected team.</p>
+      </section>
+    </div>
+
+    <!-- Round control -->
+    <section class="card" style="margin:0 24px 24px" aria-labelledby="round-title">
+      <h2 id="round-title">Round control and finalization</h2>
+      <div class="row">
+        <div class="col">
+          <label>Your team</label>
+          <select id="teamSelect"></select>
+        </div>
+        <div class="col">
+          <label>Initial die roll (Round 1)</label>
+          <input type="number" id="initialRoll" min="1" max="6" placeholder="1–6" />
+        </div>
+        <div class="col" style="align-self:flex-end">
+          <button id="startGame">Start game</button>
+        </div>
+      </div>
+
+      <div class="inline-actions" style="margin-top:10px">
+        <button id="nextRound">Next round</button>
+        <button class="secondary" id="convertAllUsd">Convert all to USD (current ratios)</button>
+        <span class="pill"><strong>Rounds:</strong> Final convert unlocks after the last round.</span>
+      </div>
+
+      <div class="row" style="margin-top:12px">
+        <div class="col">
+          <label>Final USD price (enter after last round)</label>
+          <input type="number" id="finalUsdRate" min="0" step="0.01" placeholder="Enter final USD price" />
+        </div>
+        <div class="col" style="align-self:flex-end">
+          <button id="finalConvert">Convert all to USD (final price)</button>
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:12px">
+        <div class="col">
+          <div class="final-score">Final score (USD): <span id="finalScore">0</span></div>
+        </div>
+        <div class="col">
+          <div id="roundStatus" class="pill"><strong>Status:</strong> Waiting to start</div>
+        </div>
+      </div>
+    </section>
+
+    <div class="footer">
+      <div class="pill"><strong>Tip:</strong> Next round adds dice to values; only your selected team receives income = 2 × its current value.</div>
+      <div class="pill"><strong>Precision:</strong> UI shows whole dollars; secondary line shows exact decimals.</div>
+    </div>
+  </div>
+
+  <!-- Modal for round input -->
+  <div class="modal-backdrop" id="modalBackdrop" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <header>
+        <h2 id="modalTitle" style="text-align:center; padding:12px 16px">Enter secret dice for all teams</h2>
+      </header>
+      <div class="content">
+        <p class="help" style="color:var(--muted)">Enter this round's secret die (1–6) for each team. No auto-conversions or swaps occur.</p>
+        <div class="grid-6" id="modalInputs"></div>
+        <div id="modalError" class="error" style="display:none"></div>
+        <div id="modalSuccess" class="success" style="display:none"></div>
+      </div>
+      <div class="actions">
+        <button class="secondary" id="cancelModal">Cancel</button>
+        <button id="submitModal">Submit round</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+/* ========================
+   STATE
+   ======================== */
+const TEAMS = ["USD","TeamA","TeamB","TeamC","TeamD","TeamE"];
+let banks = Object.fromEntries(TEAMS.map(t => [t, 0]));   // decimal precision internally
+let values = Object.fromEntries(TEAMS.map(t => [t, 0]));  // current value anchors (sum of dice)
+let roundNumber = 0;
+let maxRounds = 4;
+let currentTeam = null;
+
+/* ========================
+   DOM
+   ======================== */
+const teamSelect = document.getElementById("teamSelect");
+const initialRollInput = document.getElementById("initialRoll");
+const startGameBtn = document.getElementById("startGame");
+
+const convertFrom = document.getElementById("convertFrom");
+const convertTo = document.getElementById("convertTo");
+const convertAmount = document.getElementById("convertAmount");
+const convertBtn = document.getElementById("convertBtn");
+
+const bankChart = document.getElementById("bankChart");
+const banksGrid = document.getElementById("banksGrid");
+
+const nextRoundBtn = document.getElementById("nextRound");
+const convertAllUsdBtn = document.getElementById("convertAllUsd");
+const finalUsdRateInput = document.getElementById("finalUsdRate");
+const finalConvertBtn = document.getElementById("finalConvert");
+const finalScoreEl = document.getElementById("finalScore");
+const roundStatusEl = document.getElementById("roundStatus");
+
+const modalBackdrop = document.getElementById("modalBackdrop");
+const modalInputs = document.getElementById("modalInputs");
+const modalError = document.getElementById("modalError");
+const modalSuccess = document.getElementById("modalSuccess");
+const cancelModalBtn = document.getElementById("cancelModal");
+const submitModalBtn = document.getElementById("submitModal");
+
+const roundCountInput = document.getElementById("roundCount");
+
+/* ========================
+   UTIL
+   ======================== */
+function populateTeamSelects(){
+  const opts = TEAMS.map(t => `<option value="${t}">${t === "USD" ? "USD" : t.replace("Team","Team ")}</option>`).join("");
+  teamSelect.innerHTML = opts;
+  convertFrom.innerHTML = opts;
+  convertTo.innerHTML = opts;
+}
+function fmt(n){ return Math.floor(Number(n)).toLocaleString(undefined,{maximumFractionDigits:0}); }
+function precise(n){ return Number(n).toLocaleString(undefined,{minimumFractionDigits:2, maximumFractionDigits:2}); }
+function clampDice(n){ const x = Number(n); return Number.isFinite(x) ? Math.min(6, Math.max(1, x)) : NaN; }
+function showStatus(msg){ roundStatusEl.innerHTML = "<strong>Status:</strong> " + msg; }
+function openModal(){ modalBackdrop.style.display = "flex"; modalBackdrop.setAttribute("aria-hidden","false"); buildModalInputs(); }
+function closeModal(){ modalBackdrop.style.display = "none"; modalBackdrop.setAttribute("aria-hidden","true"); modalError.style.display = "none"; modalSuccess.style.display = "none"; }
+
+/* ========================
+   UI BUILD
+   ======================== */
+function buildModalInputs(){
+  modalInputs.innerHTML = "";
+  TEAMS.forEach(t=>{
+    const wrap = document.createElement("div");
+    const label = document.createElement("label");
+    label.textContent = t + " secret die (1–6)";
+    const input = document.createElement("input");
+    input.type = "number"; input.min = "1"; input.max = "6"; input.placeholder = "1–6";
+    input.id = "modal_"+t;
+    wrap.appendChild(label); wrap.appendChild(input);
+    modalInputs.appendChild(wrap);
+  });
+}
+function drawChart(){
+  const ctx = bankChart.getContext("2d");
+  const W = bankChart.width, H = bankChart.height;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle="#222";
+  ctx.font="12px system-ui";
+  ctx.strokeStyle="#ccc";
+  ctx.lineWidth=1;
+  ctx.beginPath();
+  ctx.moveTo(40,10); ctx.lineTo(40,H-30); ctx.lineTo(W-10,H-30);
+  ctx.stroke();
+
+  const vals = TEAMS.map(t=>banks[t]);
+  const maxVal = Math.max(1, ...vals);
+  const barW = (W-70)/TEAMS.length - 10;
+
+  TEAMS.forEach((t,i)=>{
+    const x = 50 + i*(barW+10);
+    const h = Math.round((banks[t]/maxVal) * (H-60));
+    ctx.fillStyle = "#2b6ef2";
+    ctx.fillRect(x, H-30-h, barW, h);
+    ctx.fillStyle="#333";
+    ctx.textAlign="center";
+    ctx.fillText(t, x+barW/2, H-12);
+    ctx.fillStyle="#000";
+    ctx.fillText(fmt(banks[t]), x+barW/2, H-30-h-6);
+  });
+}
+function buildBanksGrid(){
+  banksGrid.innerHTML = "";
+  TEAMS.forEach(t=>{
+    const card = document.createElement("div");
+    card.className = "bank";
+    const h3 = document.createElement("h3");
+    h3.textContent = t;
+
+    const amt = document.createElement("div");
+    amt.className = "amount";
+    amt.id = "amt_"+t;
+    amt.textContent = "Balance: " + fmt(banks[t]);
+
+    const preciseEl = document.createElement("div");
+    preciseEl.className = "precise";
+    preciseEl.id = "precise_"+t;
+    preciseEl.textContent = "Exact: " + precise(banks[t]);
+
+    const lab = document.createElement("label");
+    lab.textContent = "Manual current value (sum of dice)";
+    const inp = document.createElement("input");
+    inp.type = "number"; inp.min="0"; inp.step="1";
+    inp.id = "val_"+t;
+    inp.value = values[t];
+    inp.addEventListener("input", ()=>{
+      const v = Number(inp.value);
+      values[t] = Number.isFinite(v) ? v : 0;
+      refreshBanksUI();
+    });
+
+    const note = document.createElement("div");
+    note.className="muted";
+    note.textContent = "Used for conversion ratios and round income.";
+
+    card.append(h3, amt, preciseEl, lab, inp, note);
+    banksGrid.appendChild(card);
+  });
+}
+function refreshBanksUI(){
+  TEAMS.forEach(t=>{
+    const el = document.getElementById("amt_"+t);
+    if(el) el.textContent = "Balance: " + fmt(banks[t]);
+    const pEl = document.getElementById("precise_"+t);
+    if(pEl) pEl.textContent = "Exact: " + precise(banks[t]);
+    const valEl = document.getElementById("val_"+t);
+    if(valEl && valEl.value != values[t]) valEl.value = values[t];
+  });
+  drawChart();
+}
+
+/* ========================
+   ROUND COUNT CONTROL
+   ======================== */
+roundCountInput.addEventListener("input", ()=>{
+  const val = Number(roundCountInput.value);
+  if(Number.isFinite(val) && val >= 1){
+    maxRounds = val;
+    showStatus(`Max rounds set to ${maxRounds}.`);
+  }
+});
+
+/* ========================
+   GAME FLOW
+   ======================== */
+startGameBtn.addEventListener("click", ()=>{
+  const team = teamSelect.value;
+  const roll = Number(initialRollInput.value);
+  if(!Number.isFinite(roll) || roll < 1 || roll > 6){
+    showStatus("Enter a valid initial die (1–6).");
+    return;
+  }
+  currentTeam = team;
+  roundNumber = 1;
+  TEAMS.forEach(t=>{ banks[t]=0; values[t]=0; });
+  values[currentTeam] = roll;
+  banks[currentTeam] += roll * 2; // starting cash
+  buildBanksGrid();
+  refreshBanksUI();
+  showStatus(`Game started — Round 1. Starting cash credited to ${currentTeam}.`);
+});
+
+convertBtn.addEventListener("click", ()=>{
+  const from = convertFrom.value;
+  const to = convertTo.value;
+  const amt = Number(convertAmount.value);
+
+  if(from === to){ showStatus("Choose two different currencies to convert."); return; }
+  if(!Number.isFinite(amt) || amt <= 0){ showStatus("Enter a positive amount to convert."); return; }
+  if(banks[from] < amt){ showStatus(`Insufficient balance in ${from} to convert.`); return; }
+
+  const vFrom = values[from], vTo = values[to];
+  if(vFrom <= 0 || vTo <= 0){ showStatus("Both currencies need a current value (> 0) to convert."); return; }
+
+  const received = amt * (vTo / vFrom); // precise math
+  banks[from] -= amt;                    // subtract exact amount
+  banks[to]   += received;               // add exact amount
+
+  refreshBanksUI();
+  alert(`Converted ${precise(amt)} ${from} → ${precise(received)} ${to}`);
+  showStatus(`Converted ${fmt(amt)} ${from} → ${fmt(received)} ${to}.`);
+});
+
+nextRoundBtn.addEventListener("click", ()=>{
+  if(!currentTeam){ showStatus("Start the game first."); return; }
+  if(roundNumber > maxRounds){ showStatus(`All ${maxRounds} rounds completed.`); return; }
+  openModal();
+});
+
+cancelModalBtn.addEventListener("click", closeModal);
+
+submitModalBtn.addEventListener("click", ()=>{
+  // Collect and validate dice for all teams
+  const rolls = {};
+  for(const t of TEAMS){
+    const val = clampDice(document.getElementById("modal_"+t).value);
+    if(!Number.isFinite(val)){
+      modalError.style.display="block";
+      modalError.textContent = "All teams must have a valid secret die (1–6).";
+      return;
+    }
+    rolls[t] = val;
+  }
+  modalError.style.display = "none";
+
+  // Update current values (no auto conversions/swaps)
+  TEAMS.forEach(t=>{ values[t] += rolls[t]; });
+
+  // Credit income ONLY to the team currently selected; no other balances touched
+  const selectedTeam = teamSelect.value;
+  const income = values[selectedTeam] * 2; // exact decimals preserved
+  banks[selectedTeam] += income;
+
+  // Advance round
+  roundNumber += 1;
+  refreshBanksUI();
+
+  // Modal success + close
+  modalSuccess.style.display="block";
+  modalSuccess.textContent = `Round ${roundNumber} applied. Income credited to ${selectedTeam}.`;
+  setTimeout(()=>{ closeModal(); }, 700);
+
+  // Status update
+  if(roundNumber < maxRounds){
+    showStatus(`Round ${roundNumber} complete. Prepare for next round.`);
+  } else if(roundNumber === maxRounds){
+    showStatus(`Round ${roundNumber} complete. Enter final USD price and run final conversion.`);
+  } else {
+    showStatus(`All ${maxRounds} rounds completed.`);
+  }
+});
+
+convertAllUsdBtn.addEventListener("click", ()=>{
+  const vUSD = values["USD"];
+  if(vUSD <= 0){ showStatus("USD must have a current value (> 0) to convert."); return; }
+  let totalUSD = banks["USD"];
+  TEAMS.forEach(t=>{
+    if(t === "USD") return;
+    const v = values[t];
+    if(v > 0){ totalUSD += banks[t] * (vUSD / v); }
+  });
+  TEAMS.forEach(t=> banks[t] = 0);
+  banks["USD"] = totalUSD;
+  refreshBanksUI();
+  showStatus("All currencies converted to USD using current ratios.");
+});
+
+finalConvertBtn.addEventListener("click", ()=>{
+  if(roundNumber !== maxRounds){
+    showStatus("Final conversion is only available after the last round.");
+    return;
+  }
+  const finalUSD = Number(finalUsdRateInput.value);
+  if(!Number.isFinite(finalUSD) || finalUSD <= 0){
+    showStatus("Enter a valid final USD price (> 0).");
+    return;
+  }
+
+  let totalUSD = banks["USD"];
+  TEAMS.forEach(t=>{
+    if(t === "USD") return;
+    const v = values[t];
+    if(v > 0){ totalUSD += banks[t] * (finalUSD / v); }
+  });
+  TEAMS.forEach(t=> banks[t]=0);
+  banks["USD"] = totalUSD;
+  finalScoreEl.textContent = fmt(totalUSD);
+  refreshBanksUI();
+  showStatus("Final conversion complete. Game over.");
+});
+
+/* ========================
+   INIT
+   ======================== */
+populateTeamSelects();
+buildBanksGrid();
+refreshBanksUI();
+drawChart();
+showStatus("Waiting to start");
+
+// Sync round count input to state on load and change
+maxRounds = Number(roundCountInput.value) || 4;
+roundCountInput.addEventListener("change", ()=>{
+  const val = Number(roundCountInput.value);
+  if(Number.isFinite(val) && val >= 1){ maxRounds = val; }
+});
+
+// Accessibility: ESC closes modal
+document.addEventListener("keydown",(e)=>{
+  if(e.key === "Escape" && modalBackdrop.style.display === "flex"){
+    closeModal();
+  }
+});
+</script>
+</body>
+</html>
+
+
+
