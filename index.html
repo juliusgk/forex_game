@@ -173,7 +173,7 @@
 /* ========================
    STATE
    ======================== */
-const TEAMS = ["USD","TeamA","TeamB","TeamC","TeamD","TeamE"];
+const TEAMS = ["USD","AUD","BRL","CAD","DKK","EUR"];
 let banks = Object.fromEntries(TEAMS.map(t => [t, 0]));   // decimal precision internally
 let values = Object.fromEntries(TEAMS.map(t => [t, 0]));  // current value anchors (sum of dice)
 let roundNumber = 0;
